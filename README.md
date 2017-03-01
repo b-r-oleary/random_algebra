@@ -11,7 +11,16 @@ With the simple statement,
 import random_algebra
 ```
 
-we monkeypatch the `scipy.stats.rv_frozen` class that is inherited by all frozen probability distributions. 
+By monkeypatching the `scipy.stats.rv_frozen` class that is inherited by all frozen probability distributions, we can modify the way that these objects interact with each other and interact with numeric constants. 
+
+Given that `x`, `y` are random variables and `a` is a float, the following methods are available:
+- `scale`: multiplying a random variable by a constant, `scale(x, a) = a * x`
+- `offset`: adding a random variable to a constant, `offset(x, a) = a + x`
+- `add`: adding two random variables, `add(x, y) = x + y`
+- `multiply`: multiplying two random variables, `multiply(x, y) = x * y`
+- `inverse`: finding the multiplicative inverse of two random variables, `inverse(x) = 1 / x`
+- `posterior`: finding the posterior given two random variables representing the likelihood and prior, `posterior(x, y) = x and y`
+- division of two random variables is also possible within this framework, `multiply(x, inverse(y)) = x / y`
 
 
 ```python
@@ -23,7 +32,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set(style="white", font_scale=1.3)
 
-from random_algebra import posterior, scale, add, offset, plot_dist
+from random_algebra import posterior, plot_dist
 
 from scipy.stats import beta, uniform, norm
 ```
@@ -69,7 +78,7 @@ plt.tight_layout()
 ```
 
 
-![png](./images/output_7_0.png)
+![png](output_7_0.png)
 
 
 Here is another example in which case we are computing the difference between two uniform distributions of different widths.
@@ -94,7 +103,7 @@ plt.tight_layout()
 ```
 
 
-![png](./images/output_9_0.png)
+![png](output_9_0.png)
 
 
 Using the `random_algebra.posterior` we can generate posterior distributions as per Bayes theorem as well.
@@ -112,5 +121,5 @@ _ = plt.ylabel('posterior pdf(x)')
 ```
 
 
-![png](./images/output_11_0.png)
+![png](output_11_0.png)
 

@@ -23,11 +23,9 @@ def plot_dist( dist,
     s_range = max(samples) - min(samples)
 
     if lower is None:
-        lower = (dist.a if (np.isfinite(dist.a) and dist.a is not None)
-                 else min(samples) - s_range/10.0)
+        lower = min(samples) - s_range/10.0
     if upper is None:
-        upper = (dist.b if (np.isfinite(dist.b) and dist.b is not None) 
-                 else max(samples) + s_range/10.0)
+        upper = max(samples) + s_range/10.0
 
     if type not in ["pdf", "cdf"]:
         raise NotImplementedError()

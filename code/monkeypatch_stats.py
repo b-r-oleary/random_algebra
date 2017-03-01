@@ -1,6 +1,6 @@
 from __future__ import division, print_function
 from .algebra import rv_continuous, rv_frozen,\
-					           scale, offset, add, posterior
+					           scale, offset, add, multiply, inverse, posterior
 
 from scipy.stats import norm
 import numpy as np
@@ -47,6 +47,8 @@ def __mul__(self, other):
             return np.nan
         else:
             return scale(self, float(other))
+    elif isinstance(other, rv_frozen):
+        return multiply(self, other)
     else:
         raise NotImplementedError()
         
@@ -63,10 +65,16 @@ def __div__(self, other):
         else:
             other = 1/float(other)
         return self.__mul__(other)
+    elif isinstance(other, rv_frozen):
+        return multiply(self, inverse(other))
     else:
         raise NotImplementedError()
 
 def __rdiv__(self, other):
+    inverse_self = inverse(self)
+    return inverse_self.__mul__(other)
+
+def __truediv__(self, other):
     return self.__div__(other)
 
 def __sub__(self, other):
@@ -87,6 +95,9 @@ def __gt__(self, other):
 def __ge__(self, other):
 	return self.__gt__(other)
 
+def __and__(self, other):
+  return posterior(self, other)
+
 
 objects = [rv_frozen]
 
@@ -103,7 +114,8 @@ methods = dict(mean=mean,
                __le__=__le__,
                __lt__=__lt__,
                __gt__=__gt__,
-               __ge__=__ge__)
+               __ge__=__ge__,
+               __and__=__and__)
     
 for obj in objects:
     for name, method in methods.items():

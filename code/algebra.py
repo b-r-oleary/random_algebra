@@ -1,8 +1,12 @@
 from __future__ import division
 from scipy.stats._distn_infrastructure import rv_continuous, rv_frozen
 from scipy.special import binom as binom_coef
-from scipy.integrate import quad
+from scipy.integrate import quad as quad0
 import numpy as np
+
+
+quad = lambda f, a, b, **kwargs: quad0(f, a, b, limit=200, **kwargs)
+
 
 class scale_gen(rv_continuous):
     """
@@ -84,6 +88,7 @@ class offset_gen(rv_continuous):
     
 offset = offset_gen(name="offset")
 
+
 class add_gen(rv_continuous):
     """
     add two random variables
@@ -93,7 +98,7 @@ class add_gen(rv_continuous):
         dist0, dist1 = extract_first(dist0, dist1)
         pdf_integrand = lambda y, z: dist0.pdf(z - y) * dist1.pdf(y)
         pdf = np.vectorize(
-                lambda z: quad(pdf_integrand, dist1.a, dist1.b, args=(z,))[0]
+                lambda z: quad(pdf_integrand, -np.inf, np.inf, args=(z,))[0]
               )
         return pdf(x)
     
@@ -101,7 +106,7 @@ class add_gen(rv_continuous):
         dist0, dist1 = extract_first(dist0, dist1)
         cdf_integrand = lambda y, z: dist0.cdf(z - y) * dist1.pdf(y)
         cdf = np.vectorize(
-                lambda z: quad(cdf_integrand, dist1.a, dist1.b, args=(z,))[0]
+                lambda z: quad(cdf_integrand, -np.inf, np.inf, args=(z,))[0]
               )
         return cdf(x)
     
@@ -128,6 +133,76 @@ class add_gen(rv_continuous):
     
 add = add_gen(name="add")
 
+
+class multiply_gen(rv_continuous):
+    """
+    multiply two random variables
+    """
+    
+    def _pdf(self, x, dist0, dist1):
+        dist0, dist1 = extract_first(dist0, dist1)
+        pdf_integrand = lambda y, z: dist0.pdf(z / y) * dist1.pdf(y) / np.abs(y)
+        pdf = np.vectorize(
+                lambda z: quad(pdf_integrand, -np.inf, np.inf, args=(z,))[0]
+              )
+        return pdf(x)
+    
+    def _cdf(self, x, dist0, dist1):
+        dist0, dist1 = extract_first(dist0, dist1)
+        cdf_integrand = lambda y, z: dist0.cdf(z / y) * dist1.pdf(y)
+        cdf = np.vectorize(
+                lambda z: quad(cdf_integrand, -np.inf, np.inf, args=(z,))[0]
+              )
+        return cdf(x)
+    
+    def _rvs(self, dist0, dist1):
+        dist0, dist1 = extract_first(dist0, dist1)
+        return dist0.rvs(size=self._size) * dist1.rvs(size=self._size)
+    
+    def _munp(self, n, dist0, dist1):
+        dist0, dist1 = extract_first(dist0, dist1)
+        return dist0.moment(n) * dist1.moment(n)
+    
+    def _argcheck(self, dist0, dist1):
+        dist0, dist1 = extract_first(dist0, dist1)
+        conditions = [
+            isinstance(dist0, rv_frozen),
+            isinstance(dist1, rv_frozen)
+        ]
+        return all(conditions)
+    
+multiply = multiply_gen(name="multiply")
+
+
+class inverse_gen(rv_continuous):
+    """
+    find the multiplicative inverse of a random variable
+    """
+    
+    def _pdf(self, x, dist):
+        dist, = extract_first(dist)
+        return dist.pdf(1 / x)/ (x**2)
+    
+    def _cdf(self, x, dist):
+        dist, = extract_first(dist)
+        return 1 - dist.cdf(1 / x)
+    
+    def _rvs(self, dist):
+        dist, = extract_first(dist)
+        return 1 / dist.rvs(size=self._size)
+    
+    def _munp(self, n, dist):
+        dist, = extract_first(dist)
+        return quad(lambda x: dist.pdf(x) * (1.0 / x)**n, -np.inf, np.inf)[0]
+    
+    def _argcheck(self, dist):
+        dist, = extract_first(dist)
+        conditions = [
+            isinstance(dist, rv_frozen),
+        ]
+        return all(conditions)
+
+inverse = inverse_gen(name="inverse")
 
 class posterior_gen(rv_continuous):
     """
