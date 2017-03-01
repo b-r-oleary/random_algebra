@@ -98,6 +98,28 @@ def __ge__(self, other):
 def __and__(self, other):
   return posterior(self, other)
 
+def __str__(self):
+    name = self.dist.__class__.__name__
+    if name.endswith('_gen'):
+        name = name[:-4]
+    if any([isinstance(arg, rv_frozen) for arg in self.args]):
+        string_args = "(\n" + indent(
+                        ',\n'.join([str(arg) for arg in self.args])
+                      ) + '\n)'
+    else:
+        string_args = str(self.args)
+    return "{name}{args}".format(name=name,
+                                 args=string_args)
+
+
+def __repr__(self):
+    return str(self)
+    
+def indent(text, prefix="   "):
+    return '\n'.join([
+            prefix + line for line in text.split('\n')
+        ])
+
 
 objects = [rv_frozen]
 
@@ -115,7 +137,9 @@ methods = dict(mean=mean,
                __lt__=__lt__,
                __gt__=__gt__,
                __ge__=__ge__,
-               __and__=__and__)
+               __and__=__and__,
+               __str__=__str__,
+               __repr__=__repr__)
     
 for obj in objects:
     for name, method in methods.items():

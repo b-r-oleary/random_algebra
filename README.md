@@ -123,3 +123,36 @@ _ = plt.ylabel('posterior pdf(x)')
 
 ![png](./images/output_11_0.png)
 
+
+I have overridden the `rv_frozen` `__str__` and `__repr__` methods to provide a useful representation of the operations that are being performed to evaluate a probability distribution after performing some algebra with random variables. Here is an example:
+
+
+```python
+x = beta(5, 6)
+y = uniform()
+z = norm(2)
+
+d = 5 * x / y - z + 1
+
+print(d)
+```
+
+    offset(
+       add(
+          multiply(
+             scale(
+                beta(5, 6),
+                5.0
+             ),
+             inverse(
+                uniform()
+             )
+          ),
+          scale(
+             norm(2,),
+             -1.0
+          )
+       ),
+       1.0
+    )
+
