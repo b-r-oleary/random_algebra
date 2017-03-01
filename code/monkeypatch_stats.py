@@ -21,6 +21,20 @@ def get_normal_approx(self):
     """
     return norm(self.mean(), self.std())
 
+def approx(self, type="norm"):
+    if type == "norm":
+        return norm(self.mean(), self.std())
+    elif type == "uniform":
+        mean = self.mean()
+        std  = self.std()
+        return uniform(mean - np.sqrt(3) * std, np.sqrt(12) * std)
+
+def get_name(self):
+    name = self.dist.__class__.__name__
+    if name.endswith('_gen'):
+        name = name[:-4]
+    return name
+
 # add the addition and comparison operators
 def __add__(self, other):
     if isinstance(other, rv_frozen):
@@ -99,9 +113,7 @@ def __and__(self, other):
   return posterior(self, other)
 
 def __str__(self):
-    name = self.dist.__class__.__name__
-    if name.endswith('_gen'):
-        name = name[:-4]
+    name = self.get_name()
     if any([isinstance(arg, rv_frozen) for arg in self.args]):
         string_args = "(\n" + indent(
                         ',\n'.join([str(arg) for arg in self.args])
@@ -126,6 +138,8 @@ objects = [rv_frozen]
 methods = dict(mean=mean,
                std=std,
                get_normal_approx=get_normal_approx,
+               approx=approx,
+               get_name=get_name,
                __add__=__add__,
                __mul__=__mul__,
                __div__=__div__,
