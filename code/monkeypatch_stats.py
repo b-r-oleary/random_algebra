@@ -1,37 +1,52 @@
+from __future__ import division, print_function
 from .algebra import rv_continuous, rv_frozen,\
-					 rv_scale, rv_offset, rv_sum
-from scipy.stats import norm
+					           scale, offset, add, posterior
 
-def get_normal_approx(self, *args, **kwargs):
+from scipy.stats import norm
+import numpy as np
+
+## for some reason calling `moment` is much faster
+## than calling `mean` and `std`, so i am overiding those methods:
+def mean(self):
+    return self.moment(1)
+
+def std(self):
+    return np.sqrt(self.moment(2) - self.moment(1)**2)
+
+def get_normal_approx(self):
     """
     a method to be appended to scipy.stats distributions
     to quickly extract a normal distribution approximation from
     a potentially complex distribution that may be slow to compute
     """
-    return norm(self.mean(*args, **kwargs), 
-                self.std( *args, **kwargs))
-
-# append this method to rv_continuous and rv_frozen
-setattr(rv_continuous, "get_normal_approx",
-    get_normal_approx
-)
-
-setattr(rv_frozen, "get_normal_approx",
-    get_normal_approx
-)
+    return norm(self.mean(), self.std())
 
 # add the addition and comparison operators
 def __add__(self, other):
-    if isinstance(other, (rv_frozen, rv_continuous)):
-        return rv_sum(self, other)
+    if isinstance(other, rv_frozen):
+        return add(self, other)
     elif isinstance(other, (int, float)):
-        return rv_offset(self, other)
+        if other == 0:
+            return self
+        elif other in [np.inf, -np.inf, np.nan]:
+            return other
+        else:
+            return offset(self, float(other))
     else:
         raise NotImplementedError()
     
 def __mul__(self, other):
-    if isinstance(other, (int, float)):
-        return rv_scale(self, other)
+    if isinstance(other, bool):
+        return self
+    elif isinstance(other, (int, float)):
+        if other == 1:
+            return self
+        elif other in [0]:
+            return other
+        elif not np.isfinite(other):
+            return np.nan
+        else:
+            return scale(self, float(other))
     else:
         raise NotImplementedError()
         
@@ -41,11 +56,24 @@ def __radd__(self, other):
 def __rmul__(self, other):
     return self.__mul__(other)
 
+def __div__(self, other):
+    if isinstance(other, (int, float)):
+        if other == 0:
+            other = np.nan
+        else:
+            other = 1/float(other)
+        return self.__mul__(other)
+    else:
+        raise NotImplementedError()
+
+def __rdiv__(self, other):
+    return self.__div__(other)
+
 def __sub__(self, other):
     return self + (-1) * other
 
 def __lt__(self, other):
-	if isinstance(other, (rv_frozen, rv_continuous, int, float)):
+	if isinstance(other, (rv_frozen, int, float)):
 		return (self - other).cdf(0)
 	else:
 		raise NotImplementedError()
@@ -60,13 +88,17 @@ def __ge__(self, other):
 	return self.__gt__(other)
 
 
+objects = [rv_frozen]
 
-        
-objects = [rv_frozen, rv_continuous]
-methods = dict(__add__=__add__,
+methods = dict(mean=mean,
+               std=std,
+               get_normal_approx=get_normal_approx,
+               __add__=__add__,
                __mul__=__mul__,
+               __div__=__div__,
                __radd__=__radd__,
                __rmul__=__rmul__,
+               __rdiv__=__rdiv__,
                __sub__=__sub__,
                __le__=__le__,
                __lt__=__lt__,

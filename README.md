@@ -11,17 +11,19 @@ With the simple statement,
 import random_algebra
 ```
 
-we monkeypatch the `scipy.statst.rv_continuous` class that is inherited by all continuous probability distributions. 
+we monkeypatch the `scipy.stats.rv_frozen` class that is inherited by all frozen probability distributions. 
 
 
 ```python
+import sys
+sys.path.insert(0, '..')
+
 %matplotlib inline
 import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set(style="white", font_scale=1.3)
 
-import random_algebra
-from random_algebra.code import test_dist
+from random_algebra import posterior, scale, add, offset, plot_dist
 
 from scipy.stats import beta, uniform, norm
 ```
@@ -39,12 +41,12 @@ Inequalities operated on these objects result in probabilites that the inequalit
 
 
 ```python
-print("P(a > b) = %.2f numerical calculation" % (a > b))
-print("P(a > b) = %.2f normal approximation" % ((a - b).get_normal_approx() > 0))
+print("P(a > b) = %.3f numerical calculation" % (a > b))
+print("P(a > b) = %.3f normal approximation" % ((a - b).get_normal_approx() > 0))
 ```
 
-    P(a > b) = 0.70 numerical calculation
-    P(a > b) = 0.67 normal approximation
+    P(a > b) = 0.700 numerical calculation
+    P(a > b) = 0.665 normal approximation
 
 
 I have included a simple plot function to compare a probability distribution with an empirically generated histogram of samples from that distribution, and the normal approximation to that distribution.
@@ -56,8 +58,7 @@ plot_types = ["pdf", "cdf"]
 for i, plot_type in enumerate(plot_types):
     plt.subplot(len(plot_types), 1, i + 1)
     
-    test_dist(c,
-              lower=-1, upper=1,
+    plot_dist(c,
               n=35, samples=20000,
               type=plot_type)
     
@@ -75,20 +76,41 @@ Here is another example in which case we are computing the difference between tw
 
 
 ```python
-d = 2 * uniform() - uniform()
+d = 20 * (2 * uniform() - uniform())
 
-test_dist(d, lower=-2.5, upper=2.5, n=35)
+plt.subplot(2,1,1)
+plot_dist(d)
 plt.ylabel("pdf(d)")
 plt.xlabel('d')
+
+centered_and_scaled_d = (d - d.mean())/d.std()
+
+plt.subplot(2,1,2)
+plot_dist(centered_and_scaled_d)
+plt.ylabel("pdf(centered and scaled d)")
+plt.xlabel('centered and scaled d')
+
+plt.tight_layout()
 ```
 
 
+![png](./images/output_9_0.png)
 
 
-    <matplotlib.text.Text at 0x7f3af5a873d0>
+Using the `random_algebra.posterior` we can generate posterior distributions as per Bayes theorem as well.
 
 
+```python
+prior_dist      = uniform(.25, .5)
+likelihood_dist = beta(4, 1)
+
+posterior_dist  = posterior(likelihood_dist, prior_dist)
+
+plot_dist(posterior_dist)
+plt.xlabel('x')
+_ = plt.ylabel('posterior pdf(x)')
+```
 
 
-![png](./images/output_9_1.png)
+![png](./images/output_11_0.png)
 

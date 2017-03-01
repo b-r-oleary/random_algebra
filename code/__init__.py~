@@ -1,0 +1,4 @@
+# from monkeypatch_stats import *
+# from monkeypatch_stats import scale, add, offset, posterior
+from algebra import scale, add, offset, posterior
+from plots import test_dist
