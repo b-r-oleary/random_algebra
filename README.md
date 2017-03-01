@@ -78,7 +78,7 @@ plt.tight_layout()
 ```
 
 
-![png](output_7_0.png)
+![png](./images/output_7_0.png)
 
 
 Here is another example in which case we are computing the difference between two uniform distributions of different widths.
@@ -103,7 +103,7 @@ plt.tight_layout()
 ```
 
 
-![png](output_9_0.png)
+![png](./images/output_9_0.png)
 
 
 Using the `random_algebra.posterior` we can generate posterior distributions as per Bayes theorem as well.
@@ -121,5 +121,5 @@ _ = plt.ylabel('posterior pdf(x)')
 ```
 
 
-![png](output_11_0.png)
+![png](./images/output_11_0.png)
 
