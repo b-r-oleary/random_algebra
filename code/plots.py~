@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from itertools import cycle
 sns.set(style="white", font_scale=1.3)
 
 def plot_dist(dists, labels=None, label="", **kwargs):
@@ -15,12 +14,10 @@ def _plot_dist(dist,
                 n=35, samples=10000,
                 legend_loc=(1.5, .7),
                 type="pdf",
-                show_approx=True,
+                show_normal_approx=True,
                 show_random_samples=True,
                 show_dist=True,
-                label="",
-                approx_options=None,
-                color=None):
+                label=""):
     """
     given an input distribution object, plot
     the exact distribution, normal approximation to
@@ -53,8 +50,7 @@ def _plot_dist(dist,
             hist_kws=dict(cumulative=True)
 
         sns.distplot(samples, hist_kws=hist_kws,
-                     kde=False, norm_hist=True, label="random samples " + label,
-                     color=color)
+                     kde=False, norm_hist=True, label="random samples " + label)
 
     x = np.linspace(lower, upper, n)
 
@@ -64,17 +60,15 @@ def _plot_dist(dist,
         elif type == "cdf":
             p = dist.cdf(x)
 
-        plt.plot(x, p, label="exact " + type + " " + label, color=color)
+        plt.plot(x, p, label="exact " + type + " " + label)
 
-    if show_approx:
-        if approx_options is None:
-            approx_options = dict()
+    if show_normal_approx:
         if type == "pdf":
-            p_a = dist.approx(**approx_options).pdf(x)
+            p_a = dist.get_normal_approx().pdf(x)
         elif type == "cdf":
-            p_a = dist.approx(**approx_options).cdf(x)
+            p_a = dist.get_normal_approx().cdf(x)
 
-        plt.plot(x, p_a, '--', label="approx " + type + " " + label, color=color)
+        plt.plot(x, p_a, label="normal approximation " + type + " " + label)
 
     plt.legend(bbox_to_anchor=legend_loc)
     plt.xlim([lower, upper])
@@ -82,15 +76,11 @@ def _plot_dist(dist,
 
 def _plot_dists(dists, 
                 lower=None, upper=None,
-                show_approx=False,
+                show_normal_approx=False,
                 show_random_samples=False,
                 show_dist=True,
                 labels=None,
-                colors=None,
                **kwargs):
-
-    if colors is None:
-        colors = sns.color_palette(n_colors=len(dists))
 
     uppers = []
     lowers = []
@@ -101,14 +91,13 @@ def _plot_dists(dists,
         if len(labels) != len(dists):
             raise IOError("number of labels must match number of distributions.")
 
-    for dist, label, color in zip(dists, labels, colors):
+    for dist, label in zip(dists, labels):
         plot_dist(dist,
                   lower=lower, upper=upper,
-                  show_approx=show_approx,
+                  show_normal_approx=show_normal_approx,
                   show_random_samples=show_random_samples,
                   show_dist=show_dist,
                   label=label,
-                  color=color,
                   **kwargs)
 
         lo, up = plt.gca().get_xlim()

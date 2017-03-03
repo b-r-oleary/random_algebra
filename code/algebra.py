@@ -307,34 +307,6 @@ class posterior_gen(rv_continuous):
         self.__object_hash = object_hash
         return self.__norm
 
-# class either_gen(rv_continuous):
-
-#     def _pdf(self, x, dist0, dist1):
-#         dist0, dist1 = extract_first(dist0, dist1)
-#         return (dist0.pdf(x) + dist1.pdf(x)) / 2.0
-
-#     def _cdf(self, x, dist0, dist1):
-#         dist0, dist1 = extract_first(dist0, dist1)
-#         return (dist0.cdf(x) + dist1.cdf(x)) / 2.0
-
-#     def _rvs(self, likelihood, prior, factor=30):
-#         dist0, dist1 = extract_first(dist0, dist1)
-        
-#         dist = np.random.choice([dist0, dist1])
-#         return dist.
-    
-#     def _munp(self, n, likelihood, prior):
-#         likelihood, prior = extract_first(likelihood, prior)
-#         self.__get_norm(likelihood, prior)
-#         return quad(lambda x: x**n * self._pdf(x, likelihood, prior), self.a, self.b)[0]
-    
-#     def _argcheck(self, likelihood, prior):
-#         likelihood, prior = extract_first(likelihood, prior)
-#         conditions = [
-#             isinstance(likelihood, rv_frozen),
-#             isinstance(prior,      rv_frozen),
-#         ]
-#         return all(conditions)
 
 # wrap the add method to capture some special cases for speed:
 def posterior_special_cases(posterior):
