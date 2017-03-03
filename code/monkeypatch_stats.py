@@ -158,3 +158,5 @@ methods = dict(mean=mean,
 for obj in objects:
     for name, method in methods.items():
         setattr(obj, name, method)
+
+mean = lambda list_input: sum(list_input) / len(list_input)

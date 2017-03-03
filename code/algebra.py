@@ -275,7 +275,7 @@ class posterior_gen(rv_continuous):
         size = tuple(self._size)
         N = np.prod(size)
         
-        items = prior.rvs(size= N * factor)
+        items = prior.rvs(size=(N * factor,))
         prob  = likelihood.pdf(items)
         prob  = prob/sum(prob)
         
@@ -379,7 +379,6 @@ def posterior_special_cases(posterior):
 posterior = posterior_special_cases(
                 posterior_gen(name="posterior")
             )
-
 
 def extract_first(*args):
     """
