@@ -1,10 +1,11 @@
 from __future__ import division
 from scipy.stats._distn_infrastructure import rv_continuous, rv_frozen
 from scipy.special import binom as binom_coef
+from scipy.special import factorial
 from scipy.integrate import quad as quad0
-from scipy.stats import norm, beta, cauchy, chi2, uniform
+from scipy.stats import norm, beta, cauchy, chi2, uniform, lognorm, exponnorm, foldnorm, loggamma
+from summation import infinite_sum
 import numpy as np
-
 
 quad = lambda f, a, b, **kwargs: quad0(f, a, b, limit=200, **kwargs)
 
@@ -54,6 +55,16 @@ def scale_special_cases(scale):
         name = dist.get_name()
         if name == "norm":
             return norm(dist.mean() * factor, dist.std() * factor)
+        if name == "scale":
+            d, f = dist.args
+            return modified_scale(d, f * factor)
+        if name == "offset":
+            d, o = dist.args
+            return offset(
+                        modified_scale(
+                            d,
+                            factor),
+                        o * factor)
         else:
             return scale(dist, factor)
 
@@ -63,6 +74,49 @@ scale = scale_special_cases(
             scale_gen(name="scale")
         )
 
+class abs_gen(rv_continuous):
+    """
+    scale a random variable by a constant value
+    """
+    
+    def _pdf(self, x, dist):
+        dist, = extract_first(dist)
+        return (x >= 0) * (dist.pdf(x) + dist.pdf(-x))
+    
+    def _cdf(self, x, dist):
+        dist, = extract_first(dist)
+        return (x >= 0) * (dist.cdf(np.abs(x)) - dist.cdf(-np.abs(x)))
+    
+    def _rvs(self, dist):
+        dist, = extract_first(dist)
+        return np.abs(dist.rvs(size=self._size))
+    
+    def _munp(self, n, dist):
+        dist, = extract_first(dist)
+        return quad(lambda x: self._pdf(x, dist), 0, np.inf)[0]
+    
+    def _argcheck(self, dist):
+        dist, = extract_first(dist)
+        conditions = [
+            isinstance(dist, rv_frozen),
+        ]
+        return all(conditions)
+
+def abs_special_cases(abs_val):
+
+    def modified_abs(dist):
+        name = dist.get_name()
+        if name == "norm":
+            m, s = dist.mean(), dist.std()
+            return foldnorm(m/s, 0, s)
+
+        return abs_val(dist)
+
+    return modified_abs
+
+abs_val = abs_special_cases(
+                abs_gen(name="abs")
+          )
 
 class offset_gen(rv_continuous):
     """
@@ -108,6 +162,9 @@ def offset_special_cases(offset):
         name = dist.get_name()
         if name == "norm":
             return norm(dist.mean() + value, dist.std())
+        elif name == "offset":
+            d, o = dist.args
+            return modified_offset(d, o + value)
         else:
             return offset(dist, value)
 
@@ -179,6 +236,17 @@ def add_special_cases(add):
                 df0, = dist0.args
                 df1, = dist1.args
                 return chi2(df0 + df1)
+        else:
+            items = resolve(["norm", "expon"], [dist0, dist1])
+            if items is not None:
+                d0, d1 = items
+                n_mean, n_std = d0.mean(), d0.std()
+                e_mean, e_std = d1.mean(), d1.std()
+
+                m = n_mean + (e_mean - e_std)
+                s = n_std
+                k = e_std / n_std
+                return exponnorm(k, m, s)
 
         return add(dist0, dist1)
 
@@ -352,6 +420,138 @@ posterior = posterior_special_cases(
                 posterior_gen(name="posterior")
             )
 
+
+class power_gen(rv_continuous):
+    
+    def _pdf(self, x, dist, k):
+        k, dist = extract_first(k, dist)
+        
+        pdf = lambda y: dist.pdf(np.sign(y) * np.abs(y)**(1 / k)) / (k * np.abs(y)**(1 - 1 / k)) 
+        
+        if k % 2 == 0:
+            return (x > 0) * (pdf(np.abs(x)) + pdf(-np.abs(x)))
+        if k % 2 == 1:
+            return pdf(x)
+
+    def _cdf(self, x, dist, k):
+        k, dist = extract_first(k, dist)
+        
+        if k % 2 == 0:
+            return (x > 0) * ( dist.cdf(  np.abs(x) ** (1 / k)) - 
+                               dist.cdf(- np.abs(x) ** (1 / k)))
+        if k % 2 == 1:
+            return dist.cdf(np.sign(x) * np.abs(x) ** (1 / k))
+        
+    def _munp(self, n, dist, k):
+        k, dist = extract_first(k, dist)
+        return dist.moment(n * k)
+    
+    def _rvs(self, dist, k):
+        k, dist = extract_first(k, dist)
+        return dist.rvs(self._size) ** k
+    
+    def _argcheck(self, dist, k):
+        k, dist = extract_first(k, dist)
+        conditions = [
+            isinstance(dist, rv_frozen),
+            isinstance(k,    int),
+        ]
+        return all(conditions)
+
+power = power_gen(name="power") 
+
+
+class exp_gen(rv_continuous):
+    
+    def _pdf(self, x, base, dist):
+        base, dist = extract_first(base, dist)
+        return (x > 0) * (dist.pdf(np.log(x) / np.log(base))) / ( np.log(base) * x )
+
+    def _cdf(self, x, base, dist):
+        base, dist = extract_first(base, dist)
+        return (x > 0) * dist.cdf(np.log(x) / np.log(base))
+        
+    def _munp(self, n, base, dist):
+        base, dist = extract_first(base, dist)
+        return quad(lambda x: x**n * self._pdf(x, base, dist), 0, np.inf)[0]
+    
+    def _rvs(self, base, dist):
+        base, dist = extract_first(base, dist)
+        return base ** dist.rvs(self._size)
+    
+    def _argcheck(self, base, dist):
+        base, dist = extract_first(base, dist)
+        conditions = [
+            isinstance(dist, rv_frozen),
+            isinstance(base, (float, int)),
+        ]
+        return all(conditions)
+
+def exp_special_cases(exp):
+
+    def modified_exp(base, dist):
+        name = dist.get_name()
+        if name == "norm":
+            mean, std = dist.mean(), dist.std()
+            if mean == 0:
+                return lognorm(std * np.log(base))
+        return exp(base, dist)
+
+    return modified_exp
+
+exp = exp_special_cases(
+         exp_gen(name="exp")
+      )
+
+
+class log_gen(rv_continuous):
+    
+    def _pdf(self, x, dist, base):
+        dist, base = extract_first(dist, base)
+        return dist.pdf(base**x) * np.log(base) * (base**x)
+
+    def _cdf(self, x, dist, base):
+        dist, base = extract_first(dist, base)
+        return dist.cdf(base**x)
+        
+    def _munp(self, n, dist, base):
+        dist, base = extract_first(dist, base)
+        return quad(lambda x: (np.log(x) / np.log(base))**n * dist.pdf(x), 0, np.inf)[0]
+    
+    def _rvs(self, dist, base):
+        dist, base = extract_first(dist, base)
+        return np.log(dist.rvs(size=self._size)) / np.log(base)
+    
+    def _argcheck(self, dist, base):
+        dist, base = extract_first(dist, base)
+        conditions = [
+            isinstance(dist, rv_frozen),
+            isinstance(base, (float, int)),
+        ]
+        return all(conditions)
+
+def log_special_cases(log):
+
+    def modified_log(dist, base=np.exp(1)):
+        name = dist.get_name()
+        if name == 'lognorm':
+            args = dist.args[0]
+            if len(args) == 1:
+                return norm(0, args[0] / np.log(base))
+
+        if name == 'gamma':
+            mean, std = dist.mean(), dist.std()
+            if mean == std**2:
+                return loggamma(mean)
+
+        return log(dist, base)
+
+    return modified_log
+
+log = log_special_cases(
+         log_gen(name="log")
+      )
+
 def extract_first(*args):
     """
     since scipy.stats distributions are fed an array of inputs,
@@ -366,3 +566,25 @@ def extract_first(*args):
             output = arg
         outputs.append(output)
     return tuple(outputs)
+
+def resolve(names, items):
+    """
+    this method returns None
+    if the list **items** do not contain names in **names**,
+    but otherwise outputs items in the same order as names
+    """
+    if len(names) != len(items):
+        raise IOError()
+        
+    item_names = [item.get_name() for item in items]
+    
+    if sorted(names) != sorted(item_names):
+        return None
+    
+    output = []
+    for name in names:
+        index = item_names.index(name)
+        output.append(items.pop(index))
+        item_names.pop(index)
+        
+    return tuple(output)

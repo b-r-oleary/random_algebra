@@ -1,10 +1,13 @@
 from __future__ import division, print_function
 from .algebra import rv_continuous, rv_frozen,\
-					           scale, offset, add, multiply, inverse, posterior
+					           scale, offset, add, multiply, inverse, posterior, power, exp, log, abs_val
 from .algebra_with_dist_arrays import combination, either, order_statistic,\
                                       min_statistic, max_statistic, median, mean
 
-from scipy.stats import norm, uniform
+from scipy.stats import norm, uniform, loggamma
+from scipy.optimize import root
+from scipy.special import polygamma
+
 import numpy as np
 
 ## for some reason calling `moment` is much faster
@@ -14,6 +17,19 @@ def _mean(self):
 
 def _std(self):
     return np.sqrt(self.moment(2) - self.moment(1)**2)
+
+def get_loggamma_c(skewness):
+    """
+    this method provides the shape parameter c for a loggamma distribution
+    given the skewness
+    """
+    r = root(
+          lambda c: (polygamma(2, c) / np.power(polygamma(1, c), 1.5) + np.abs(skewness)), 1
+            )
+    if r.message == 'The solution converged.':
+        return r.x[0]
+    else:
+        return r.nan
 
 def get_normal_approx(self):
     """
@@ -34,7 +50,20 @@ def approx(self, type="norm", from_samples=False, samples=10000):
         return norm(mean, std)
     elif type == "uniform":
         return uniform(mean - np.sqrt(3) * std, np.sqrt(12) * std)
+    elif type == "loggamma":
+        mu, std, skew = self.mean(), self.std(), self.stats(moments="s")
+        c = get_loggamma_c(skew)
 
+        a = loggamma(c)
+        a = scale(
+                offset(a, - a.mean()),
+                -np.sign(skew) / a.std())
+        a = offset(
+                  scale(a, std),
+                  mu)
+        return a
+    else:
+        raise NotImplementedError('approximation not defined for input type')
 
 def get_name(self):
     name = self.dist.__class__.__name__
@@ -122,6 +151,33 @@ def __and__(self, other):
 def __or__(self, other):
     return either(self, other)
 
+def __pow__(self, n):
+    if isinstance(n, (int, float)):
+        return power(self, n)
+    else:
+        raise NotImplementedError()
+
+def __rpow__(self, base):
+    if isinstance(base, (int, float)):
+        return exp(base, self)
+    else:
+        raise NotImplementedError()
+
+def __neg__(self):
+    return scale(self, -1)
+
+def __pos__(self):
+    return self
+
+def __exp__(self):
+    return exp(np.exp(1), self)
+
+def __log__(self):
+    return log(self)
+
+def __abs__(self):
+    return abs_val(self)
+
 def __str__(self):
     name = self.get_name()
     if any([isinstance(arg, rv_frozen) for arg in self.args]):
@@ -133,7 +189,6 @@ def __str__(self):
     return "{name}{args}".format(name=name,
                                  args=string_args)
 
-
 def __repr__(self):
     return str(self)
     
@@ -142,7 +197,6 @@ def indent(text, prefix="   "):
             prefix + line for line in text.split('\n')
         ])
 
-
 objects = [rv_frozen]
 
 methods = dict(mean=_mean,
@@ -150,12 +204,18 @@ methods = dict(mean=_mean,
                get_normal_approx=get_normal_approx,
                approx=approx,
                get_name=get_name,
+               exp=__exp__,
+               log=__log__,
+               __neg__=__neg__,
+               __pos__=__pos__,
+               __abs__=__abs__,
                __add__=__add__,
                __mul__=__mul__,
                __div__=__div__,
                __radd__=__radd__,
                __rmul__=__rmul__,
                __rdiv__=__rdiv__,
+               __truediv__=__truediv__,
                __sub__=__sub__,
                __le__=__le__,
                __lt__=__lt__,
@@ -163,6 +223,8 @@ methods = dict(mean=_mean,
                __ge__=__ge__,
                __and__=__and__,
                __or__=__or__,
+               __pow__=__pow__,
+               __rpow__=__rpow__,
                __str__=__str__,
                __repr__=__repr__)
     
