@@ -34,6 +34,8 @@ def _plot_dist(dist,
     if not show_random_samples:
         samples = 300
 
+    label = str(label)
+
     samples = dist.rvs(size=(samples,))
 
     s_range = max(samples) - min(samples)

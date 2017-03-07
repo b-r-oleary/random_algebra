@@ -4,9 +4,10 @@ from .algebra import rv_continuous, rv_frozen,\
 from .algebra_with_dist_arrays import combination, either, order_statistic,\
                                       min_statistic, max_statistic, median, mean
 
-from scipy.stats import norm, uniform, loggamma
+from scipy.stats import norm, uniform, loggamma, skew
 from scipy.optimize import root
 from scipy.special import polygamma
+from sklearn.mixture import GaussianMixture
 
 import numpy as np
 
@@ -39,29 +40,58 @@ def get_normal_approx(self):
     """
     return norm(self.mean(), self.std())
 
-def approx(self, type="norm", from_samples=False, samples=10000):
+def approx(self, type="norm", from_samples=False, samples=25000, n_components=2):
+
+    types = ["norm", "uniform", "loggamma", "gaussian_mixture"]
+
+    if type not in types:
+        raise NotImplementedError("allowed types are " + str(types))
+
+    if type == "gaussian_mixture":
+        if n_components <= 1:
+            return self.approx(type="norm", 
+                               from_samples=from_samples, 
+                               samples=samples)
+        from_samples=True
+
     if from_samples:
         rv = self.rvs(samples)
-        mean, std = np.mean(rv), np.std(rv)
+        mean, std, skewness = np.mean(rv), np.std(rv), skew(rv)
     else:
-        mean, std = self.mean(), self.std()
+        mean, std, skewness = self.mean(), self.std(), self.stats(moments="s")
 
     if type == "norm":
         return norm(mean, std)
     elif type == "uniform":
         return uniform(mean - np.sqrt(3) * std, np.sqrt(12) * std)
     elif type == "loggamma":
-        mu, std, skew = self.mean(), self.std(), self.stats(moments="s")
-        c = get_loggamma_c(skew)
+        if skewness == 0:
+            return self.approx(type="norm", 
+                               from_samples=from_samples, 
+                               samples=samples)
+
+        c = get_loggamma_c(skewness)
 
         a = loggamma(c)
         a = scale(
                 offset(a, - a.mean()),
-                -np.sign(skew) / a.std())
+                -np.sign(skewness) / a.std())
         a = offset(
                   scale(a, std),
-                  mu)
+                  mean)
         return a
+    elif type == "gaussian_mixture":
+        gm = GaussianMixture(n_components=n_components)
+        gm.fit(np.atleast_2d(rv).T)
+
+        mean    = gm.means_[:, 0]
+        var     = gm.covariances_[:,0, 0]
+        weights = gm.weights_
+
+        return combination([norm(m, np.sqrt(v))
+                            for m, v in zip(mean, var)],
+                            list(weights))
+
     else:
         raise NotImplementedError('approximation not defined for input type')
 
@@ -180,12 +210,18 @@ def __abs__(self):
 
 def __str__(self):
     name = self.get_name()
-    if any([isinstance(arg, rv_frozen) for arg in self.args]):
+
+    args = ["[{l}]".format(l=',\n '.join(str(item) for item in arg))
+            if isinstance(arg, (tuple, list)) else arg
+            for arg in self.args]
+
+    if any([isinstance(arg, (rv_frozen, list, tuple)) for arg in self.args]):
+
         string_args = "(\n" + indent(
-                        ',\n'.join([str(arg) for arg in self.args])
+                        ',\n'.join([str(arg) for arg in args])
                       ) + '\n)'
     else:
-        string_args = str(self.args)
+        string_args = str(tuple(args))
     return "{name}{args}".format(name=name,
                                  args=string_args)
 

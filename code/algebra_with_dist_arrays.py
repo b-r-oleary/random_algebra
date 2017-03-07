@@ -1,8 +1,9 @@
 from __future__ import division
 from scipy.stats._distn_infrastructure import rv_continuous, rv_frozen
+from scipy.integrate import quad
 from .algebra import add, scale
 import numpy as np
-
+from itertools import permutations
 
 class combination_gen(rv_continuous):
     """
@@ -44,6 +45,28 @@ class combination_gen(rv_continuous):
     	assert self.argcheck(dists, ps)
     	ps = np.array(ps) / sum(ps)
     	return np.sum([p * dist.moment(n) for p, dist in zip(ps, dists)])
+
+    def stats(self, dists, ps, moments="mv"):
+        assert self.argcheck(dists, ps)
+        mu, mu2 = self.moment(1, dists, ps), self.moment(2, dists, ps)
+        var = mu2 - mu**2
+        mu3, mu4 = self.moment(3, dists, ps), self.moment(4, dists, ps)
+        g1 = (mu3 - 3 * mu2 * mu + 2 * mu**3) / var**(3/2)
+        g2 = (mu4 - 4 * mu3 * mu + 6 * mu2 * mu**2 - 3 * mu**4) / var**2 - 3
+
+        output = []
+        for char in moments:
+            if char == "m":
+                output.append(mu)
+            elif char == "v":
+                output.append(var)
+            elif char == "s":
+                output.append(g1)
+            elif char == "k":
+                output.append(g2)
+            else:
+                raise NotImplementedError('moments must be in "mvsk"')
+        return tuple([np.array(i) for i in output])
     
     def argcheck(self, dists, ps):
         conditions = [
@@ -75,6 +98,12 @@ class order_statistic_gen(rv_continuous):
             ))
         return sum([term(x) for term in terms])
 
+    def cdf(self, x, k, dists):
+        assert self.argcheck(k, dists)
+        return np.vectorize(
+                lambda x: quad(lambda y: self.pdf(y, k, dists), -np.inf, x)[0]
+        )(x)
+
     def rvs(self, k, dists, random_state=0, size=None):
         assert self.argcheck(k, dists)
 
@@ -94,6 +123,10 @@ class order_statistic_gen(rv_continuous):
             return rv[0]
         else:
             return rv
+
+    def moment(self, n, k, dists):
+        assert self.argcheck(k, dists)
+        return quad(lambda y: y**n * self.pdf(y, k, dists), -np.inf, np.inf)[0]
     
     def argcheck(self, k, dists):
         conditions = [

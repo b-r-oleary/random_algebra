@@ -535,7 +535,7 @@ def log_special_cases(log):
     def modified_log(dist, base=np.exp(1)):
         name = dist.get_name()
         if name == 'lognorm':
-            args = dist.args[0]
+            args = dist.args
             if len(args) == 1:
                 return norm(0, args[0] / np.log(base))
 
