@@ -1,5 +1,5 @@
 from __future__ import division
-from scipy.stats._distn_infrastructure import rv_continuous, rv_frozen
+from scipy.stats._distn_infrastructure import rv_continuous, rv_frozen, rv_discrete
 from scipy.integrate import quad
 from .algebra import add, scale
 import numpy as np
@@ -158,3 +158,48 @@ def mean(dists):
     return scale(
                reduce(add, dists), 1 / float(len(dists))
            )
+
+class argmax_gen(rv_discrete):
+    """
+    this is a distribution which, given a list of input continuous random variables,
+    gives the probability that each one is the largest variable
+    """
+    
+    # override `pmf` rather than `_pmf` to allow a list input of dists
+    def pmf(self, k, dists):
+        assert self.argcheck(k, dists)
+        return np.vectorize(lambda x: self.__get_p(x, dists))(k)
+    
+    # create a separate function to perform the calculation and cache the results
+    def __get_p(self, k, dists):
+
+        if k not in range(len(dists)):
+            return 0
+
+        if not hasattr(self, "cache"):
+            self.cache = dict()
+
+        if k in self.cache:
+            return self.cache[k]
+
+        integrand = lambda x: np.prod([
+            dist.cdf(x) if i != k else dist.pdf(x)
+            for i, dist in enumerate(dists)
+        ])
+
+        p = quad(integrand, -np.inf, np.inf)[0]
+
+        if p > 0 and np.isfinite(p):
+            self.cache[k] = p
+            
+        return p
+
+    def argcheck(self, k, dists):
+        conditions = [
+            all([isinstance(dist, rv_frozen) for dist in dists]),
+            np.all(np.in1d(np.array(k), range(len(dists)))),
+        ]
+        return all(conditions)
+
+    
+argmax = argmax_gen(name="argmax")

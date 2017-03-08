@@ -1,8 +1,10 @@
 from __future__ import division, print_function
+
 from .algebra import rv_continuous, rv_frozen,\
 					           scale, offset, add, multiply, inverse, posterior, power, exp, log, abs_val
+
 from .algebra_with_dist_arrays import combination, either, order_statistic,\
-                                      min_statistic, max_statistic, median, mean
+                                      min_statistic, max_statistic, median, mean, argmax
 
 from scipy.stats import norm, uniform, loggamma, skew
 from scipy.optimize import root

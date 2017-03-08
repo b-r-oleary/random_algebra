@@ -4,6 +4,10 @@ import numpy as np
 from itertools import cycle
 sns.set(style="white", font_scale=1.3)
 
+from tempfile import NamedTemporaryFile
+from matplotlib import animation
+from IPython.display import HTML
+
 def plot_dist(dists, labels=None, label="", **kwargs):
     if isinstance(dists, (tuple, list)):
         return _plot_dists(dists, labels=labels, **kwargs)
@@ -124,3 +128,18 @@ def _plot_dists(dists,
         up = max(uppers)
 
     plt.gca().set_xlim([lo, up])
+
+
+IMG_TAG = """<img src="data:image/gif;base64,{0}" alt="some_text">"""
+
+def anim_to_gif(anim):
+    data="0"
+    with NamedTemporaryFile(suffix='.gif') as f:
+        anim.save(f.name, writer='imagemagick', fps=10);
+        data = open(f.name, "rb").read()
+        data = data.encode("base64")
+    return IMG_TAG.format(data)
+
+def display_animation(anim):
+    plt.close(anim._fig)
+    return HTML(anim_to_gif(anim))
