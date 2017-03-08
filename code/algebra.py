@@ -3,7 +3,7 @@ from scipy.stats._distn_infrastructure import rv_continuous, rv_frozen
 from scipy.special import binom as binom_coef
 from scipy.special import factorial
 from scipy.integrate import quad as quad0
-from scipy.stats import norm, beta, cauchy, chi2, uniform, lognorm, exponnorm, foldnorm, loggamma
+from scipy.stats import norm, beta, cauchy, chi2, uniform, lognorm, exponnorm, foldnorm, loggamma, reciprocal
 from summation import infinite_sum
 import numpy as np
 
@@ -68,7 +68,13 @@ def scale_special_cases(scale):
         else:
             return scale(dist, factor)
 
-    return modified_scale
+    def modified_bounds(dist, factor):
+        output = modified_scale(dist, factor)
+        bounds = factor * np.array([dist.a, dist.b])
+        output.a, output.b = np.min(bounds), np.max(bounds)
+        return output
+
+    return modified_bounds
     
 scale = scale_special_cases(
             scale_gen(name="scale")
@@ -112,7 +118,13 @@ def abs_special_cases(abs_val):
 
         return abs_val(dist)
 
-    return modified_abs
+    def modified_bounds(dist):
+        output = modified_abs(dist)
+        bounds = np.abs(np.array([dist.a, dist.b]))
+        output.a, output.b = np.min(bounds), np.max(bounds)
+        return output
+
+    return modified_bounds
 
 abs_val = abs_special_cases(
                 abs_gen(name="abs")
@@ -168,7 +180,13 @@ def offset_special_cases(offset):
         else:
             return offset(dist, value)
 
-    return modified_offset
+    def modified_bounds(dist, value):
+        output = modified_offset(dist, value)
+        bounds = np.array([dist.a, dist.b]) + value
+        output.a, output.b = np.min(bounds), np.max(bounds)
+        return output
+
+    return modified_bounds
     
 offset = offset_special_cases(
             offset_gen(name="offset")
@@ -250,7 +268,13 @@ def add_special_cases(add):
 
         return add(dist0, dist1)
 
-    return modified_add
+    def modified_bounds(dist0, dist1):
+        output = modified_add(dist0, dist1)
+        bounds = np.array([dist0.a + dist1.a, dist0.b + dist1.b])
+        output.a, output.b = np.min(bounds), np.max(bounds)
+        return output
+
+    return modified_bounds
 
 add = add_special_cases(
             add_gen(name="add")
@@ -293,8 +317,33 @@ class multiply_gen(rv_continuous):
             isinstance(dist1, rv_frozen)
         ]
         return all(conditions)
+
+def multiply_special_cases(multiply):
+
+    def modified_multiply(dist0, dist1):
+        name0, name1 = dist0.get_name(), dist1.get_name()
+        if name0 == name1:
+            if name0 == "lognorm":
+                if len(dist0.args) == 1 and len(dist1.args) == 1:
+                    s0, s1 = dist0.args[0], dist1.args[0]
+                    return lognorm(np.sqrt(s0**2 + s1**2))
+
+        return multiply(dist0, dist1)
+
+    def modified_bounds(dist0, dist1):
+        output = modified_multiply(dist0, dist1)
+        bounds = np.array([dist0.a * dist1.a, 
+                           dist0.b * dist1.b,
+                           dist0.a * dist1.b,
+                           dist0.b * dist1.a])
+        output.a, output.b = np.min(bounds), np.max(bounds)
+        return output
+
+    return modified_bounds
     
-multiply = multiply_gen(name="multiply")
+multiply = multiply_special_cases(
+                multiply_gen(name="multiply")
+           )
 
 
 class inverse_gen(rv_continuous):
@@ -324,6 +373,31 @@ class inverse_gen(rv_continuous):
             isinstance(dist, rv_frozen),
         ]
         return all(conditions)
+
+def inverse_special_cases(inverse):
+
+    def modified_inverse(dist):
+        name = dist.get_name()
+        if name == "reciprocal":
+            a, b = dist.a, dist.b
+            return reciprocal(1.0/b, 1.0/a)
+        return inverse(dist)
+
+    def modified_bounds(dist):
+        output = modified_multiply(dist)
+        bounds = [dist.a, dist.b]
+        if 0 in bounds:
+            if mean(bounds) > 0:
+                new_bounds = [1 / np.max(bounds), np.inf]
+            else:
+                new_bounds = [-np.inf, 1 / np.min(bounds)]
+        else:
+            new_bounds = [1 / np.min(bounds), 1 / np.max(bounds)]
+
+        output.a, output.b = np.min(new_bounds), np.max(new_bounds)
+        return output
+
+    return modified_bounds
 
 inverse = inverse_gen(name="inverse")
 
@@ -414,7 +488,13 @@ def posterior_special_cases(posterior):
 
         return posterior(dist0, dist1)
 
-    return modified_posterior
+    def modified_bounds(dist0, dist1):
+        output = modified_posterior(dist0, dist1)
+        bounds = np.max([dist0.a, dist1.a]), np.min([dist0.b, dist1.b])
+        output.a, output.b = np.min(bounds), np.max(bounds)
+        return output
+
+    return modified_bounds
 
 posterior = posterior_special_cases(
                 posterior_gen(name="posterior")
@@ -458,8 +538,33 @@ class power_gen(rv_continuous):
         ]
         return all(conditions)
 
-power = power_gen(name="power") 
+def power_special_cases(power):
 
+    def modified_power(dist, k):
+        name = dist.get_name()
+
+        if isinstance(k, int) and k > 0:
+            if name == 'lognorm':
+                return reduce(multiply, [dist] * k)
+
+        return power(dist, k)
+
+    def modified_bounds(dist, k):
+        output = modified_power(dist, k)
+
+        bounds = [dist.a**k, dist.b**k]
+        if k % 2 == 0:
+            if np.sign(dist.a) != np.sign(dist.b):
+                bounds.append(0)
+
+        output.a, output.b = np.min(bounds), np.max(bounds)
+        return output
+
+    return modified_bounds
+
+power = power_special_cases(
+            power_gen(name="power") 
+        )
 
 class exp_gen(rv_continuous):
     
@@ -484,6 +589,7 @@ class exp_gen(rv_continuous):
         conditions = [
             isinstance(dist, rv_frozen),
             isinstance(base, (float, int)),
+            base > 0,
         ]
         return all(conditions)
 
@@ -497,7 +603,15 @@ def exp_special_cases(exp):
                 return lognorm(std * np.log(base))
         return exp(base, dist)
 
-    return modified_exp
+    def modified_bounds(base, dist):
+        output = modified_exp(base, dist)
+
+        bounds = [base**dist.a, base**dist.b]
+
+        output.a, output.b = np.min(bounds), np.max(bounds)
+        return output
+
+    return modified_bounds
 
 exp = exp_special_cases(
          exp_gen(name="exp")
