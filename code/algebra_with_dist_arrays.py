@@ -1,7 +1,7 @@
 from __future__ import division
 from scipy.stats._distn_infrastructure import rv_continuous, rv_frozen, rv_discrete
 from scipy.integrate import quad
-from .algebra import add, scale
+from .algebra import add, scale, push_bounds_to_dist
 import numpy as np
 from itertools import permutations
 
@@ -77,10 +77,34 @@ class combination_gen(rv_continuous):
         ]
         return all(conditions)
 
-combination = combination_gen(name="combination")
+def combination_special_cases(combination):
+
+    @push_bounds_to_dist
+    def modified_bounds(dists, ps=None):
+        if ps is None:
+            ps = np.ones(len(dists))
+
+        ps = np.array(ps) / sum(ps)
+
+        output = combination(dists, ps)
+
+        bounds = [bound for dist in dists
+                  for bound in [dist.a, dist.b]]
+
+        output.a, output.b = np.min(bounds), np.max(bounds)
+
+        return output
+
+    return modified_bounds
+
+combination = combination_special_cases(
+                    combination_gen(name="combination")
+              )
+
 
 def either(dist0, dist1):
     return combination([dist0, dist1], [.5, .5])
+
 
 class order_statistic_gen(rv_continuous):
     """
@@ -101,7 +125,7 @@ class order_statistic_gen(rv_continuous):
     def cdf(self, x, k, dists):
         assert self.argcheck(k, dists)
         return np.vectorize(
-                lambda x: quad(lambda y: self.pdf(y, k, dists), -np.inf, x)[0]
+                lambda x: quad(lambda y: self.pdf(y, k, dists), self.a, x)[0]
         )(x)
 
     def rvs(self, k, dists, random_state=0, size=None):
@@ -126,7 +150,7 @@ class order_statistic_gen(rv_continuous):
 
     def moment(self, n, k, dists):
         assert self.argcheck(k, dists)
-        return quad(lambda y: y**n * self.pdf(y, k, dists), -np.inf, np.inf)[0]
+        return quad(lambda y: y**n * self.pdf(y, k, dists), self.a, self.b)[0]
     
     def argcheck(self, k, dists):
         conditions = [
@@ -135,7 +159,24 @@ class order_statistic_gen(rv_continuous):
         ]
         return all(conditions)
 
-order_statistic = order_statistic_gen(name="order_statistic")
+def order_statistic_special_cases(order_statistic):
+
+    @push_bounds_to_dist
+    def modified_bounds(k, dists):
+        output = order_statistic(k, dists)
+
+        bounds = [bound for dist in dists
+                  for bound in [dist.a, dist.b]]
+
+        output.a, output.b = np.min(bounds), np.max(bounds)
+
+        return output
+
+    return modified_bounds
+
+order_statistic = order_statistic_special_cases(
+                        order_statistic_gen(name="order_statistic")
+                  )
 
 def min_statistic(dists):
     return order_statistic(0, dists)
@@ -187,7 +228,12 @@ class argmax_gen(rv_discrete):
             for i, dist in enumerate(dists)
         ])
 
-        p = quad(integrand, -np.inf, np.inf)[0]
+        bounds = [bound for dist in dists
+                  for bound in [dist.a, dist.b]]
+
+        a, b = np.min(bounds), np.max(bounds)
+
+        p = quad(integrand, a, b)[0]
 
         if p > 0 and np.isfinite(p):
             self.cache[k] = p

@@ -10,6 +10,16 @@ import numpy as np
 quad = lambda f, a, b, **kwargs: quad0(f, a, b, limit=200, **kwargs)
 
 
+def push_bounds_to_dist(method):
+
+    def modified_method(*args, **kwargs):
+        output = method(*args, **kwargs)
+        output.dist.a, output.dist.b = output.a, output.b
+        return output
+
+    return modified_method
+
+
 class scale_gen(rv_continuous):
     """
     scale a random variable by a constant value
@@ -68,6 +78,7 @@ def scale_special_cases(scale):
         else:
             return scale(dist, factor)
 
+    @push_bounds_to_dist
     def modified_bounds(dist, factor):
         output = modified_scale(dist, factor)
         bounds = factor * np.array([dist.a, dist.b])
@@ -99,7 +110,7 @@ class abs_gen(rv_continuous):
     
     def _munp(self, n, dist):
         dist, = extract_first(dist)
-        return quad(lambda x: self._pdf(x, dist), 0, np.inf)[0]
+        return quad(lambda x: self._pdf(x, dist), self.a, self.b)[0]
     
     def _argcheck(self, dist):
         dist, = extract_first(dist)
@@ -118,6 +129,7 @@ def abs_special_cases(abs_val):
 
         return abs_val(dist)
 
+    @push_bounds_to_dist
     def modified_bounds(dist):
         output = modified_abs(dist)
         bounds = np.abs(np.array([dist.a, dist.b]))
@@ -180,6 +192,7 @@ def offset_special_cases(offset):
         else:
             return offset(dist, value)
 
+    @push_bounds_to_dist
     def modified_bounds(dist, value):
         output = modified_offset(dist, value)
         bounds = np.array([dist.a, dist.b]) + value
@@ -201,7 +214,7 @@ class add_gen(rv_continuous):
         dist0, dist1 = extract_first(dist0, dist1)
         pdf_integrand = lambda y, z: dist0.pdf(z - y) * dist1.pdf(y)
         pdf = np.vectorize(
-                lambda z: quad(pdf_integrand, -np.inf, np.inf, args=(z,))[0]
+                lambda z: quad(pdf_integrand, dist1.a, dist1.b, args=(z,))[0]
               )
         return pdf(x)
     
@@ -209,7 +222,7 @@ class add_gen(rv_continuous):
         dist0, dist1 = extract_first(dist0, dist1)
         cdf_integrand = lambda y, z: dist0.cdf(z - y) * dist1.pdf(y)
         cdf = np.vectorize(
-                lambda z: quad(cdf_integrand, -np.inf, np.inf, args=(z,))[0]
+                lambda z: quad(cdf_integrand, dist1.a, dist1.b, args=(z,))[0]
               )
         return cdf(x)
     
@@ -268,6 +281,7 @@ def add_special_cases(add):
 
         return add(dist0, dist1)
 
+    @push_bounds_to_dist
     def modified_bounds(dist0, dist1):
         output = modified_add(dist0, dist1)
         bounds = np.array([dist0.a + dist1.a, dist0.b + dist1.b])
@@ -290,7 +304,7 @@ class multiply_gen(rv_continuous):
         dist0, dist1 = extract_first(dist0, dist1)
         pdf_integrand = lambda y, z: dist0.pdf(z / y) * dist1.pdf(y) / np.abs(y)
         pdf = np.vectorize(
-                lambda z: quad(pdf_integrand, -np.inf, np.inf, args=(z,))[0]
+                lambda z: quad(pdf_integrand, dist1.a, dist1.b, args=(z,))[0]
               )
         return pdf(x)
     
@@ -298,7 +312,7 @@ class multiply_gen(rv_continuous):
         dist0, dist1 = extract_first(dist0, dist1)
         cdf_integrand = lambda y, z: dist0.cdf(z / y) * dist1.pdf(y)
         cdf = np.vectorize(
-                lambda z: quad(cdf_integrand, -np.inf, np.inf, args=(z,))[0]
+                lambda z: quad(cdf_integrand, dist1.a, dist1.b, args=(z,))[0]
               )
         return cdf(x)
     
@@ -330,6 +344,7 @@ def multiply_special_cases(multiply):
 
         return multiply(dist0, dist1)
 
+    @push_bounds_to_dist
     def modified_bounds(dist0, dist1):
         output = modified_multiply(dist0, dist1)
         bounds = np.array([dist0.a * dist1.a, 
@@ -365,7 +380,7 @@ class inverse_gen(rv_continuous):
     
     def _munp(self, n, dist):
         dist, = extract_first(dist)
-        return quad(lambda x: dist.pdf(x) * (1.0 / x)**n, -np.inf, np.inf)[0]
+        return quad(lambda x: dist.pdf(x) * (1.0 / x)**n, self.a, self.b)[0]
     
     def _argcheck(self, dist):
         dist, = extract_first(dist)
@@ -383,6 +398,7 @@ def inverse_special_cases(inverse):
             return reciprocal(1.0/b, 1.0/a)
         return inverse(dist)
 
+    @push_bounds_to_dist
     def modified_bounds(dist):
         output = modified_multiply(dist)
         bounds = [dist.a, dist.b]
@@ -488,6 +504,7 @@ def posterior_special_cases(posterior):
 
         return posterior(dist0, dist1)
 
+    @push_bounds_to_dist
     def modified_bounds(dist0, dist1):
         output = modified_posterior(dist0, dist1)
         bounds = np.max([dist0.a, dist1.a]), np.min([dist0.b, dist1.b])
@@ -549,6 +566,7 @@ def power_special_cases(power):
 
         return power(dist, k)
 
+    @push_bounds_to_dist
     def modified_bounds(dist, k):
         output = modified_power(dist, k)
 
@@ -578,7 +596,7 @@ class exp_gen(rv_continuous):
         
     def _munp(self, n, base, dist):
         base, dist = extract_first(base, dist)
-        return quad(lambda x: x**n * self._pdf(x, base, dist), 0, np.inf)[0]
+        return quad(lambda x: x**n * self._pdf(x, base, dist), self.a, self.b)[0]
     
     def _rvs(self, base, dist):
         base, dist = extract_first(base, dist)
@@ -603,6 +621,7 @@ def exp_special_cases(exp):
                 return lognorm(std * np.log(base))
         return exp(base, dist)
 
+    @push_bounds_to_dist
     def modified_bounds(base, dist):
         output = modified_exp(base, dist)
 
@@ -630,7 +649,7 @@ class log_gen(rv_continuous):
         
     def _munp(self, n, dist, base):
         dist, base = extract_first(dist, base)
-        return quad(lambda x: (np.log(x) / np.log(base))**n * dist.pdf(x), 0, np.inf)[0]
+        return quad(lambda x: (np.log(x) / np.log(base))**n * dist.pdf(x), self.a, self.b)[0]
     
     def _rvs(self, dist, base):
         dist, base = extract_first(dist, base)
@@ -660,7 +679,16 @@ def log_special_cases(log):
 
         return log(dist, base)
 
-    return modified_log
+    @push_bounds_to_dist
+    def modified_bounds(dist, base=np.exp(1)):
+        output = modified_log(dist, base=base)
+
+        bounds = np.log([dist.a, dist.b]) / np.log(base)
+
+        output.a, output.b = np.min(bounds), np.max(bounds)
+        return output
+
+    return modified_bounds
 
 log = log_special_cases(
          log_gen(name="log")
