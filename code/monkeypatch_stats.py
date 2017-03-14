@@ -6,6 +6,8 @@ from .algebra import rv_continuous, rv_frozen,\
 from .algebra_with_dist_arrays import combination, either, order_statistic,\
                                       min_statistic, max_statistic, median, mean, argmax
 
+from .plots import plot_dist
+
 from scipy.stats import norm, uniform, loggamma, skew
 from scipy.optimize import root
 from scipy.special import polygamma
@@ -102,6 +104,9 @@ def get_name(self):
     if name.endswith('_gen'):
         name = name[:-4]
     return name
+
+def plot(self, **kwargs):
+    return plot_dist(self, **kwargs)
 
 # add the addition and comparison operators
 def __add__(self, other):
@@ -242,6 +247,7 @@ methods = dict(mean=_mean,
                get_normal_approx=get_normal_approx,
                approx=approx,
                get_name=get_name,
+               plot=plot,
                exp=__exp__,
                log=__log__,
                __neg__=__neg__,

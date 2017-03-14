@@ -3,7 +3,8 @@ from scipy.stats._distn_infrastructure import rv_continuous, rv_frozen
 from scipy.special import binom as binom_coef
 from scipy.integrate import quad as quad0
 from scipy.stats import norm, beta, cauchy, chi2, uniform,\
-                        lognorm, exponnorm, foldnorm, loggamma, reciprocal
+                        lognorm, exponnorm, foldnorm, loggamma, reciprocal,\
+                        fisk, logistic
 import numpy as np
 
 
@@ -651,6 +652,9 @@ def exp_special_cases(exp):
             mean, std = dist.mean(), dist.std()
             if mean == 0:
                 return lognorm(std * np.log(base))
+        if name == "logistic":
+            mean, scale = dist.mean(), dist.std() / logistic.std()
+            return fisk(1 / (scale * np.log(base)), 0) * (base ** mean)
         return exp(base, dist)
 
     @push_bounds_to_dist
