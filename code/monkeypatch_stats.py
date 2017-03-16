@@ -1,7 +1,9 @@
 from __future__ import division, print_function
 
 from .algebra import rv_continuous, rv_frozen,\
-					           scale, offset, add, multiply, inverse, posterior, power, exp, log, abs_val
+					           scale, offset, add, multiply, inverse,\
+                     posterior, power, exp, log, abs_val,\
+                     logit, expit
 
 from .algebra_with_dist_arrays import combination, either, order_statistic,\
                                       min_statistic, max_statistic, median, mean, argmax
@@ -164,8 +166,14 @@ def __rdiv__(self, other):
 def __truediv__(self, other):
     return self.__div__(other)
 
+def __rtruediv__(self, other):
+    return self.__rdiv__(other)
+
 def __sub__(self, other):
     return self + (-1) * other
+
+def __rsub__(self, other):
+    return (-1) * self + other
 
 def __lt__(self, other):
     if isinstance(other, (rv_frozen, int, float)):
@@ -260,7 +268,9 @@ methods = dict(mean=_mean,
                __rmul__=__rmul__,
                __rdiv__=__rdiv__,
                __truediv__=__truediv__,
+               __rtruediv__=__rtruediv__,
                __sub__=__sub__,
+               __rsub__=__rsub__,
                __le__=__le__,
                __lt__=__lt__,
                __gt__=__gt__,

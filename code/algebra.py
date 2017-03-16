@@ -1,6 +1,6 @@
 from __future__ import division
 from scipy.stats._distn_infrastructure import rv_continuous, rv_frozen
-from scipy.special import binom as binom_coef
+from scipy import special
 from scipy.integrate import quad as quad0
 from scipy.stats import norm, beta, cauchy, chi2, uniform,\
                         lognorm, exponnorm, foldnorm, loggamma, reciprocal,\
@@ -177,7 +177,7 @@ class offset_gen(rv_continuous):
         moment = 0
         for k in range(n + 1):
             m_k = dist.moment(k)
-            moment += binom_coef(n, k) * m_k * (offset ** (n - k))
+            moment += special.binom(n, k) * m_k * (offset ** (n - k))
         return moment
 
     def _entropy(self, dist, offset):
@@ -251,7 +251,7 @@ class add_gen(rv_continuous):
         for k in range(n + 1):
             x = dist0.moment(k)
             y = dist1.moment(n - k)
-            moment += binom_coef(n, k) * x * y
+            moment += special.binom(n, k) * x * y
         return moment
 
     def _argcheck(self, dist0, dist1):
@@ -368,6 +368,8 @@ def multiply_special_cases(multiply):
                            dist0.b * dist1.b,
                            dist0.a * dist1.b,
                            dist0.b * dist1.a])
+        bounds = [bound for bound in bounds
+                  if not(np.isnan(bound))]
         output.a, output.b = np.min(bounds), np.max(bounds)
         return output
 
@@ -433,7 +435,9 @@ def inverse_special_cases(inverse):
 
     return modified_bounds
 
-inverse = inverse_gen(name="inverse")
+inverse = inverse_special_cases(
+                inverse_gen(name="inverse")
+          )
 
 
 class posterior_gen(rv_continuous):
@@ -588,9 +592,9 @@ def power_special_cases(power):
     def modified_power(dist, k):
         name = dist.get_name()
 
-        if isinstance(k, int) and k > 0:
-            if name == 'lognorm':
-                return reduce(multiply, [dist] * k)
+        # if isinstance(k, int) and k > 0:
+        #     if name == 'lognorm':
+        #         return reduce(multiply, [dist] * k)
 
         return power(dist, k)
 
@@ -731,6 +735,58 @@ def log_special_cases(log):
 log = log_special_cases(
          log_gen(name="log")
       )
+
+
+class logit_gen(rv_continuous):
+    
+    def _pdf(self, x, dist):
+        dist, = extract_first(dist)
+        return dist.pdf(1 / (1 + np.exp(-x))) / (np.exp(x) + 2 + np.exp(-x))
+    
+    def _cdf(self, x, dist):
+        dist, = extract_first(dist)
+        return dist.cdf(1 / (1 + np.exp(-x)))
+    
+    def _rvs(self, dist):
+        dist, = extract_first(dist)
+        return special.logit(dist.rvs(self._size))
+    
+    def _argcheck(self, dist):
+        dist, = extract_first(dist)
+        conditions = [
+            isinstance(dist, rv_frozen),
+            dist.a >= 0,
+            dist.b <= 1
+        ]
+        return all(conditions)
+
+    
+logit = logit_gen(name="logit")
+
+
+class expit_gen(rv_continuous):
+    
+    def _pdf(self, x, dist):
+        dist, = extract_first(dist)
+        return dist.pdf(np.log(x / (1 - x))) * (1 / x + 1 / (1 - x))
+    
+    def _cdf(self, x, dist):
+        dist, = extract_first(dist)
+        return dist.cdf(np.log(x / (1 - x)))
+    
+    def _rvs(self, dist):
+        dist, = extract_first(dist)
+        return special.expit(dist.rvs(self._size))
+    
+    def _argcheck(self, dist):
+        dist, = extract_first(dist)
+        conditions = [
+            isinstance(dist, rv_frozen),
+        ]
+        return all(conditions)
+
+    
+expit = expit_gen(name="expit")
 
 
 def extract_first(*args):
