@@ -6,7 +6,6 @@ sns.set(style="white", font_scale=1.3)
 
 from tempfile import NamedTemporaryFile
 from matplotlib import animation
-from IPython.display import HTML
 
 def plot_dist(dists, labels=None, label="", **kwargs):
     if isinstance(dists, (tuple, list)):
@@ -141,5 +140,6 @@ def anim_to_gif(anim):
     return IMG_TAG.format(data)
 
 def display_animation(anim):
+    from IPython.display import HTML
     plt.close(anim._fig)
     return HTML(anim_to_gif(anim))
