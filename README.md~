@@ -1,3 +1,0 @@
-# `random_algebra`
-
-This is intended to be a small library that extends `scipy.stats` that facilitates some algebra with random variables (without having to resort to a monte-carlo approach)
