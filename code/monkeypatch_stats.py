@@ -8,6 +8,8 @@ from .algebra import rv_continuous, rv_frozen,\
 from .algebra_with_dist_arrays import combination, either, order_statistic,\
                                       min_statistic, max_statistic, median, mean, argmax
 
+from .multivariate import vector, multi_rv_frozen
+
 from .plots import plot_dist
 
 from scipy.stats import norm, uniform, loggamma, skew
@@ -282,6 +284,16 @@ methods = dict(mean=_mean,
                __str__=__str__,
                __repr__=__repr__)
     
+for obj in objects:
+    for name, method in methods.items():
+        setattr(obj, name, method)
+
+objects = [multi_rv_frozen]
+
+methods = dict(get_name=get_name,
+               __str__=__str__,
+               __repr__=__repr__)
+
 for obj in objects:
     for name, method in methods.items():
         setattr(obj, name, method)

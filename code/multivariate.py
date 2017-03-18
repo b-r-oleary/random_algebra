@@ -1,4 +1,4 @@
-from scipy.stats import rv_frozen
+from scipy.stats._distn_infrastructure import rv_continuous, rv_frozen
 from scipy.stats._multivariate import multi_rv_generic, multi_rv_frozen
 import numpy as np
 
@@ -9,6 +9,9 @@ class vector(multi_rv_frozen):
     """
     def __init__(self, dists):
         self.dists = np.array(dists)
+
+        self.args = tuple(self.dists)
+        self.dist = self
         
     def logpdf(self, x):
         return np.array([
@@ -41,4 +44,4 @@ class vector(multi_rv_frozen):
         else:
             raise NotImplementedError()
 
-    def __mul__(self)
+    # def __mul__(self)

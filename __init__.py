@@ -5,4 +5,4 @@ from code import plot_dist, display_animation,\
 		 max_statistic, median, mean, argmax,\
 		 logit, expit, abs_val
 
-from code import stirlings_approximation, summation, ab_testing
+from code import stirlings_approximation, summation, ab_testing, simplify
