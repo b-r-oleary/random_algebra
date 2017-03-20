@@ -3,7 +3,7 @@
 
 ### Random Variable Algebra With SciPy Probability Distributions
 
-This is intended to be a small library that extends `scipy.stats` that facilitates some simple algebra with random variables (without having to resort to a monte-carlo approach) using numerical integration from `scipy.optimize`.
+This is intended to be a small library that extends `scipy.stats` that facilitates some simple algebra with random variables (without having to resort to a monte-carlo approach) using numerical integration from `scipy.integrate`.
 
 With the simple statement,
 
@@ -26,6 +26,8 @@ Given that `x`, `y` are random variables and `a` is a float, the following metho
 - `log`: taking the log of a random variable, `log(x, base=a) = np.log(x)/np.log(a)`
 - `abs_val`: taking the absolute value of a random variables, `abs_val(x) = abs(x)`
 - `either`: that a random variable could come with equal probability from one of two distributions, `either(x, y) = x | y`
+- `logit`: the logit function applied to a variable, `logit(x)`.
+- `expit`: the inverse logit function (expit) applied to a variable, `expit(x)`.
 
 There are also several methods that take a list of distributions as input, `dists = [x, y, ... ]`:
 - `combination`: that a random variable could come from the input distributions `[x, y, ... ]` with probabilities `[p_x, p_y, ...]` is given by `combination([x, y, ...], [p_x, p_y, ...])`.
@@ -34,6 +36,8 @@ There are also several methods that take a list of distributions as input, `dist
 - `max_statistic`: The probability distribution for the max value amongst a series of random variables, `max_statistic(dists) = order_statistic(len(dists) - 1, dists)`
 - `median`: The probability distribution for the central value, in the case that `len(dists)` is odd, otherwise, the mean of the two central values.
 - `mean`: The probability distribution for the mean of the input random variables, `mean(dists) = sum(dists) / len(dists)`
+
+Currently, the capabilities of this library are currently limited to *independent* random variables and does not take into account correlations. For example, if `x` is a random variable, `x + x != 2 * x` since the multiplication operation assumes that the two inputs are independent - as a concrete example, if `x = norm(0, 1)`, then `x + x = norm(0, np.sqrt(2))` and `2 * x = norm(0, 2)`. 
 
 Here are some examples of manipulating scipy.stats distributions using this package:
 
@@ -69,10 +73,12 @@ Inequalities operated on these objects result in probabilites that the inequalit
 ```python
 print("P(a > b) = %.3f numerical calculation" % (a > b))
 print("P(a > b) = %.3f normal approximation" % ((a - b).get_normal_approx() > 0))
+print("P(a > b) = %.3f log-gamma approximation" % ((a - b).approx("loggamma") > 0))
 ```
 
     P(a > b) = 0.700 numerical calculation
     P(a > b) = 0.665 normal approximation
+    P(a > b) = 0.690 log-gamma approximation
 
 
 I have included a simple plot function to compare a probability distribution with an empirically generated histogram of samples from that distribution, and the normal approximation to that distribution.
@@ -210,7 +216,7 @@ for i in range(samples):
 print(beta_vars)
 ```
 
-    [beta(7, 5), beta(8, 4), beta(10, 2), beta(11, 1), beta(8, 4), beta(10, 2), beta(10, 2)]
+    [beta(8, 4), beta(8, 4), beta(8, 4), beta(7, 5), beta(9, 3), beta(8, 4), beta(9, 3)]
 
 
 In the case in which we do not know whether or not the value for $p$ was the same in each experiment, we may be interested in the order statistics for the value for $p$ for each experiment (though normally we may only be interested in the min, max and median).
@@ -275,15 +281,13 @@ _ = plt.ylabel('pdf(x)')
     exact  : combination(
        [foldnorm(3.4999999999999969, 0, 1.0000000000000009),
         expon()],
-       [0.5,
-        0.5]
+       [ 0.5  0.5]
     )
     
     approx : combination(
-       [norm(0.5263511870942178, 0.38556933322901493),
-        norm(3.1815570795156933, 1.1648414047563866)],
-       [0.350606371416,
-        0.649393628584]
+       [norm(3.1714917634061366, 1.1845551027334495),
+        norm(0.51390362347898877, 0.375479735743591)],
+       [ 0.65256433  0.34743567]
     )
     
 
@@ -332,7 +336,7 @@ print(mean(
       ))
 ```
 
-    norm(-0.11690489489078867, 0.10000000000000001)
+    norm(0.12479916198008736, 0.10000000000000002)
 
 
 And the posterior distribution for a beta distribution given a string on binomial likelihoods is beta, for example:
@@ -349,7 +353,7 @@ print(
 )
 ```
 
-    beta(56, 46)
+    beta(57, 45)
 
 
 Here, the exponentiation of a normal variable results in a lognormal variable, and the log of a gamma variables results in a loggamma variable (notice the inconsistency of naming between the two distributions...)
@@ -382,4 +386,54 @@ norm(2, 3) + expon(4)
 
     exponnorm(0.33333333333333331, 6.0, 3.0)
 
+
+
+### Simplification
+
+There is a built-in `simplify` method which converts a random variable computation graph to a sympy expression, simplifies that sympy expression, and then converts the simmplified expression back to a random variable computation graph.
+
+For example, we can create a variable that involves an excess number of `offset` operations.
+
+
+```python
+a = 1 + beta(.5, .5) + uniform() + 1 + beta(2, 1) + 1
+
+print(a)
+```
+
+    offset(
+       add(
+          offset(
+             add(
+                offset(
+                   beta(0.5, 0.5),
+                   1.0
+                ),
+                uniform()
+             ),
+             1.0
+          ),
+          beta(2, 1)
+       ),
+       1.0
+    )
+
+
+By simplifying this expression, the three offset operations are reduced to one:
+
+
+```python
+print(a.simplify())
+```
+
+    add(
+       add(
+          offset(
+             beta(0.5, 0.5),
+             3.0
+          ),
+          uniform()
+       ),
+       beta(2, 1)
+    )
 
